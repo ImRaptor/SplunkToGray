@@ -9,30 +9,35 @@ import requests as requests
 
 # Base configuration
 # Splunk search info
-HOST = "Splunk"
-PORT = 8089
+HOST = "Splunk"  # Splunk server
+PORT = 8089  # Splunk REST API port
 USERNAME = "admin"
 PASSWORD = "redacted"
-lineCount = 10
-searchModifier = "Host=DFSBack"
-# Graylog server info
-graylogPath = "http://graylog:12201/"
+lineCount = 1000  # Number of results to process at a time
+searchModifier = "Host=DFSBack"  # Search modifier to target a subset of data. Set to * for everything
+
+#  Graylog server info
+graylogPath = "http://graylog:12202/gelf"  # Address of a configured GELF HTTP Input on a Graylog server
+
 # Program configuration
 if os.name == 'nt':
     path = "C:\\ProgramData\\SplunkConv\\"
 else:
     path = '/var/spool/SplunkConv/'
-# logs = path+'logs.csv'
 timeMark = path+'time'
 
-# Check for path and then files
-if not os.path.isfile(timeMark):
-    endTime = time.time()
-    if not os.path.isdir(path):
-        os.mkdir(path)
+# Check for file and path
+if not os.path.isdir(path):
+    os.mkdir(path)
+elif not os.path.isfile(timeMark):
+    endTime = str(time.time())
 else:
     with open(timeMark, 'r') as timeFile:
         endTime = timeFile.read()
+
+# Deal with blank file
+if endTime is '':
+    endTime = str(time.time())
 
 # Query Splunk and get results in JSON
 service = client.connect(host=HOST, port=PORT, username=USERNAME, password=PASSWORD)
@@ -43,13 +48,12 @@ reader = results.ResultsReader(oneshot)
 
 # Fill each record to a GELF log
 for res in reader:
-    gelf = {}
-    gelf["version"] = "1.1"
-    gelf["host"] = res["host"]
-    gelf["short_message"] = res["_raw"]
-    gelf["timestamp"] = res["_indextime"]
+    gelf = {"version": "1.1",
+            "host": res["host"],
+            "short_message": res["_raw"],
+            "timestamp": res["_indextime"]}
     endTime = res["_indextime"]
-    requests.post(graylogPath, gelf)
+    requests.post(graylogPath, json=gelf)
 
 with open(timeMark, 'w') as timeFile:
     timeFile.write(endTime)

@@ -30,18 +30,18 @@ timeMark = path+'time'
 if not os.path.isdir(path):
     os.mkdir(path)
 elif not os.path.isfile(timeMark):
-    endTime = str(time.time())
+    endTime = str(int(time.time()))  # DOUBLE CAST to truncate
 else:
     with open(timeMark, 'r') as timeFile:
-        endTime = timeFile.read()
+        endTime = timeFile.read().rstrip()
 
 # Deal with blank file
 if endTime is '':
-    endTime = str(time.time())
+    endTime = str(int(time.time()))
 
 # Query Splunk and get results in JSON
 service = client.connect(host=HOST, port=PORT, username=USERNAME, password=PASSWORD)
-kwargs = {"endtime": endTime, "timeformat": "%s", "count": lineCount, "output_mode": "json"}
+kwargs = {"latest_time": endTime, "time_format": "%s", "count": lineCount, "output_mode": "json"}
 searchQuery = "search "+searchModifier
 oneshot = service.jobs.oneshot(searchQuery, **kwargs)
 reader = results.ResultsReader(oneshot)
@@ -52,8 +52,8 @@ for res in reader:
             "host": res["host"],
             "short_message": res["_raw"],
             "timestamp": res["_indextime"]}
-    endTime = res["_indextime"]
+    endTime = int(res["_indextime"])
     requests.post(graylogPath, json=gelf)
 
 with open(timeMark, 'w') as timeFile:
-    timeFile.write(endTime)
+    timeFile.write(endTime-1)  # Move end time 1 second back to prevent retrieving the same logs again

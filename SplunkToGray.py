@@ -42,7 +42,7 @@ if endTime is '':
 # Query Splunk and get results in JSON
 service = client.connect(host=HOST, port=PORT, username=USERNAME, password=PASSWORD)
 kwargs = {"latest_time": endTime, "time_format": "%s", "count": lineCount, "output_mode": "json"}
-searchQuery = "search "+searchModifier
+searchQuery = "search "+searchModifier+"|head "+str(lineCount)
 oneshot = service.jobs.oneshot(searchQuery, **kwargs)
 reader = results.ResultsReader(oneshot)
 
@@ -56,4 +56,4 @@ for res in reader:
     requests.post(graylogPath, json=gelf)
 
 with open(timeMark, 'w') as timeFile:
-    timeFile.write(endTime-1)  # Move end time 1 second back to prevent retrieving the same logs again
+    timeFile.write(str(endTime-1))  # Move end time 1 second back to prevent retrieving the same logs again

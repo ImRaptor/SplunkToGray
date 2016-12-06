@@ -3,6 +3,7 @@
 # Imports
 import os
 import time
+import yaml
 import splunklib.results as results
 import splunklib.client as client
 import requests as requests
@@ -27,15 +28,17 @@ else:
 timeMark = path+'time'
 
 # Check for file and path
+endTime = ''
 if not os.path.isdir(path):
     os.mkdir(path)
-elif not os.path.isfile(timeMark):
-    endTime = str(int(time.time()))  # DOUBLE CAST to truncate
-else:
+elif os.path.isfile(timeMark):
     with open(timeMark, 'r') as timeFile:
-        endTime = timeFile.read().rstrip()
+        readBuff = yaml.load(timeFile)
+        for line in readBuff['search']:
+            if line['modifier'] == searchModifier:
+                endTime = line['time']
 
-# Deal with blank file
+# Deal with blank time
 if endTime is '':
     endTime = str(int(time.time()))
 
@@ -46,14 +49,21 @@ searchQuery = "search "+searchModifier+"|head "+str(lineCount)
 oneshot = service.jobs.oneshot(searchQuery, **kwargs)
 reader = results.ResultsReader(oneshot)
 
+recTime = 0
 # Fill each record to a GELF log
 for res in reader:
     gelf = {"version": "1.1",
             "host": res["host"],
             "short_message": res["_raw"],
             "timestamp": res["_indextime"]}
-    endTime = int(res["_indextime"])
+    recTime = int(res["_indextime"])
     requests.post(graylogPath, json=gelf)
 
-with open(timeMark, 'w') as timeFile:
-    timeFile.write(str(endTime-1))  # Move end time 1 second back to prevent retrieving the same logs again
+with open(timeMark, mode='rw') as timeFile:
+    buff = yaml.load(timeFile)
+    stack = {'search': []}
+    for line in buff['search']:
+        if line['modifier'] == searchModifier:
+            line['time'] = str(recTime-1)  # Move end time 1 second back to prevent retrieving the same logs again
+        stack['search'].append(line)
+    timeFile.write(yaml.dump(stack))

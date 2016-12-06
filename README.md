@@ -7,9 +7,11 @@ You will need a couple of python lirbaries to get started:
 
 2) Python Requests
 
+3) Python YAML
 
-Both can be installed with pip
+
+They can be installed with pip
 
 * pip install splunk-sdk
 * pip install requests
-
+* pip install PyYAML
